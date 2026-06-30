@@ -1,0 +1,375 @@
+
+
+source('functions.r')
+require(ggplot2)
+require(tidytable)
+
+dado1<-read.table("Schizo.txt",sep=' ',col.names = c("trat","ns","indiv","week","score","cod"))
+dados=dado1[,c(5,3,4)]
+time=(as.numeric(dados[,3])-3)/10
+dado=cbind(dados,time)
+dado[,3]=dado[,3]+1
+dado[,1]=dado[,1]/10 
+dado=dado[order(dado[,2]),]
+
+
+#############################################################################################################
+# Treatment for n_i >2
+
+Nline=nrow(dado)
+indline=1:Nline
+ni=as.numeric(table(dado[,2]))
+m=length(ni)
+na1=rep(0,m)
+for (i in 1:m){
+    aux=ni[1:i]
+    na1[i]=sum(aux)
+    }
+na2=c(0,na1)
+for (i in 1:m){
+     aux=(na2[i]+1):(na2[i+1])
+     if (ni[i]<5)   indline[aux]=0
+}
+dado=dado[indline>0,]
+ni=as.numeric(table(dado[,2])) # indiv
+m=length(ni)
+###########################################################################################################
+
+thetanind=smn.lmm(dado, formFixed = score ~ 1, formFixedNL= ~ -1+time, formRandom = ~ 1+time, distr = 'norm', groupVar = "indiv", timeVar="week", depStruct = "UNC", control = lmmControl(parallelnu=FALSE,parallelphi=FALSE,algorithm = "EM", quiet = TRUE,alphas=0.5,nknots=7))
+
+resind=residuals.SMSN(thetanind,level="conditional",type="response")
+par(mfrow=c(2,2))
+hist(resind)
+boxplot(resind)
+acf(resind)
+pacf(resind)
+
+
+par(mfrow = c(2,2))
+plot.ts(resind,ylab='Standardized residual')
+plot(as.numeric(sapply(1:15, Box.test, x=resind, fitdf=0, type="Ljung-Box")[3,]), ylim = 0:1, main="Ljung-Box test", ylab="p-value", xlab="Lag");abline(h=.05,lty=2,col=4)
+acf(resind, lag.max = 15,main='Series standard residuals')
+pacf(resind, lag.max = 15,main='Series standard residuals')
+
+
+### Curves
+nknots=7
+ni1=ni
+na1=rep(0,m)
+for (i in 1:m){
+    aux=ni1[1:i]
+    na1[i]=sum(aux)
+    }
+na2=c(0,na1)
+
+aux=1:na2[2]
+t1=seq(1,max(aux),length=100)
+N1=bsplinec(t1,nknots,4)
+gammaest=thetanind$estimates$gammas
+beta0=as.numeric( thetanind$theta[1])
+f1=N1%*%gammaest[[1]]
+
+time=dado[,2]
+score=dado[,1]
+aux=(na2[1]+1):(na2[2])
+plot(1:length(aux),score[aux]-beta0,type='l',col="grey",ylim=c(-3,4),xlab="Week",ylab="Parametric residual") 
+for (i in 2:m){
+     aux=(na2[i]+1):(na2[i+1])
+     lines(1:length(aux),score[aux]-beta0,col="grey")      
+     }
+lines(t1,f1,type='l',col="black",lwd=2)
+
+logvero=thetanind$loglik
+logvero
+AIC=thetanind$criteria$AIC
+AIC
+BIC=thetanind$criteria$BIC
+BIC
+
+thetaNind=smn.lmm(dado, formFixed = score ~ 1, formFixedNL= ~ -1+time, formRandom = ~ 1+time, distr = 'norm', groupVar = "indiv", timeVar="week", depStruct = "UNC", control = lmmControl(parallelnu=FALSE,parallelphi=FALSE,algorithm = "EM", quiet = TRUE,alphas=0.5,nknots=7))
+thetaTind=smn.lmm(dado, formFixed = score ~ 1, formFixedNL= ~ -1+time, formRandom = ~ 1+time, distr = 't', groupVar = "indiv", timeVar="week", depStruct = "UNC", control = lmmControl(parallelnu=FALSE,parallelphi=FALSE,algorithm = "EM", quiet = TRUE,alphas=0.5,nknots=7))
+thetaSNind=smsn.lmm(dado, formFixed = score ~ 1, formFixedNL= ~ -1+time, formRandom = ~ 1+time, distr = 'sn', groupVar = "indiv", timeVar="week", depStruct = "UNC", control = lmmControl(parallelnu=FALSE,parallelphi=FALSE,algorithm = "EM", quiet = TRUE,alphas=0.5,nknots=7))
+thetaSTind=smsn.lmm(dado, formFixed = score ~ 1, formFixedNL= ~ -1+time, formRandom = ~ 1+time, distr = 'st', groupVar = "indiv", timeVar="week", depStruct = "UNC", control = lmmControl(parallelnu=FALSE,parallelphi=FALSE,algorithm = "EM", quiet = TRUE,alphas=0.5,nknots=7))
+thetaSSLind=smsn.lmm(dado, formFixed = score ~ 1, formFixedNL= ~ -1+time, formRandom = ~ 1+time, distr = 'ss', groupVar = "indiv", timeVar="week", depStruct = "UNC", control = lmmControl(parallelnu=FALSE,parallelphi=FALSE,algorithm = "EM", quiet = TRUE,alphas=0.5,nknots=7))
+thetaSCNind=smsn.lmm(dado, formFixed = score ~ 1, formFixedNL= ~ -1+time, formRandom = ~ 1+time, distr = 'scn', groupVar = "indiv", timeVar="week", depStruct = "UNC", control = lmmControl(parallelnu=FALSE,parallelphi=FALSE,algorithm = "EM", quiet = TRUE,alphas=0.5,nknots=7))
+
+
+thetaNar1=smn.lmm(dado, formFixed = score ~ 1, formFixedNL= ~ -1+time, formRandom = ~ 1+time, distr = 'norm', groupVar = "indiv", timeVar="week", depStruct = "ARp", pAR=1, control = lmmControl(parallelnu=FALSE,parallelphi=FALSE,algorithm = "EM", quiet = TRUE,alphas=0.5,nknots=7))
+thetaTar1=smn.lmm(dado, formFixed = score ~ 1, formFixedNL= ~ -1+time, formRandom = ~ 1+time, distr = 't', groupVar = "indiv", timeVar="week", depStruct = "ARp", pAR=1, control = lmmControl(parallelnu=FALSE,parallelphi=FALSE,algorithm = "EM", quiet = TRUE,alphas=0.5,nknots=7))
+thetaSNar1=smsn.lmm(dado, formFixed = score ~ 1, formFixedNL= ~ -1+time, formRandom = ~ 1+time, distr = 'sn', groupVar = "indiv", timeVar="week", depStruct = "ARp", pAR=1, control = lmmControl(parallelnu=FALSE,parallelphi=FALSE,algorithm = "EM", quiet = TRUE,alphas=0.5,nknots=7))
+thetaSTar1=smsn.lmm(dado, formFixed = score ~ 1, formFixedNL= ~ -1+time, formRandom = ~ 1+time, distr = 'st', groupVar = "indiv", timeVar="week", depStruct = "ARp", pAR=1, control = lmmControl(parallelnu=FALSE,parallelphi=FALSE,algorithm = "EM", quiet = TRUE,alphas=0.5,nknots=7))
+thetaSSLar1=smsn.lmm(dado, formFixed = score ~ 1, formFixedNL= ~ -1+time, formRandom = ~ 1+time, distr = 'ss', groupVar = "indiv", timeVar="week", depStruct = "ARp", pAR=1, control = lmmControl(parallelnu=FALSE,parallelphi=FALSE,algorithm = "EM", quiet = TRUE,alphas=0.5,nknots=7))
+thetaSCNar1=smsn.lmm(dado, formFixed = score ~ 1, formFixedNL= ~ -1+time, formRandom = ~ 1+time, distr = 'scn', groupVar = "indiv", timeVar="week", depStruct = "ARp", pAR=1, control = lmmControl(parallelnu=FALSE,parallelphi=FALSE,algorithm = "EM", quiet = TRUE,alphas=0.5,nknots=7))
+
+
+thetaNar2=smn.lmm(dado, formFixed = score ~ 1, formFixedNL= ~ -1+time, formRandom = ~ 1+time, distr = 'norm', groupVar = "indiv", timeVar="week", depStruct = "ARp", pAR=2, control = lmmControl(parallelnu=FALSE,parallelphi=FALSE,algorithm = "EM", quiet = TRUE,alphas=0.5,nknots=7))
+thetaTar2=smn.lmm(dado, formFixed = score ~ 1, formFixedNL= ~ -1+time, formRandom = ~ 1+time, distr = 't', groupVar = "indiv", timeVar="week", depStruct = "ARp", pAR=2, control = lmmControl(parallelnu=FALSE,parallelphi=FALSE,algorithm = "EM", quiet = TRUE,alphas=0.5,nknots=7))
+thetaSNar2=smsn.lmm(dado, formFixed = score ~ 1, formFixedNL= ~ -1+time, formRandom = ~ 1+time, distr = 'sn', groupVar = "indiv", timeVar="week", depStruct = "ARp", pAR=2, control = lmmControl(parallelnu=FALSE,parallelphi=FALSE,algorithm = "EM", quiet = TRUE,alphas=0.5,nknots=7))
+thetaSTar2=smsn.lmm(dado, formFixed = score ~ 1, formFixedNL= ~ -1+time, formRandom = ~ 1+time, distr = 'st', groupVar = "indiv", timeVar="week", depStruct = "ARp", pAR=2, control = lmmControl(parallelnu=FALSE,parallelphi=FALSE,algorithm = "EM", quiet = TRUE,alphas=0.5,nknots=7))
+thetaSSLar2=smsn.lmm(dado, formFixed = score ~ 1, formFixedNL= ~ -1+time, formRandom = ~ 1+time, distr = 'ss', groupVar = "indiv", timeVar="week", depStruct = "ARp", pAR=2, control = lmmControl(parallelnu=FALSE,parallelphi=FALSE,algorithm = "EM", quiet = TRUE,alphas=0.5,nknots=7))
+thetaSCNar2=smsn.lmm(dado, formFixed = score ~ 1, formFixedNL= ~ -1+time, formRandom = ~ 1+time, distr = 'scn', groupVar = "indiv", timeVar="week", depStruct = "ARp", pAR=2, control = lmmControl(parallelnu=FALSE,parallelphi=FALSE,algorithm = "EM", quiet = TRUE,alphas=0.5,nknots=7))
+
+
+thetaNar3=smn.lmm(dado, formFixed = score ~ 1, formFixedNL= ~ -1+time, formRandom = ~ 1+time, distr = 'norm', groupVar = "indiv", timeVar="week", depStruct = "ARp", pAR=3, control = lmmControl(parallelnu=FALSE,parallelphi=FALSE,algorithm = "EM", quiet = TRUE,alphas=0.5,nknots=7))
+thetaTar3=smn.lmm(dado, formFixed = score ~ 1, formFixedNL= ~ -1+time, formRandom = ~ 1+time, distr = 't', groupVar = "indiv", timeVar="week", depStruct = "ARp", pAR=3, control = lmmControl(parallelnu=FALSE,parallelphi=FALSE,algorithm = "EM", quiet = TRUE,alphas=0.5,nknots=7))
+thetaSNar3=smsn.lmm(dado, formFixed = score ~ 1, formFixedNL= ~ -1+time, formRandom = ~ 1+time, distr = 'sn', groupVar = "indiv", timeVar="week", depStruct = "ARp", pAR=3, control = lmmControl(parallelnu=FALSE,parallelphi=FALSE,algorithm = "EM", quiet = TRUE,alphas=0.5,nknots=7))
+thetaSTar3=smsn.lmm(dado, formFixed = score ~ 1, formFixedNL= ~ -1+time, formRandom = ~ 1+time, distr = 'st', groupVar = "indiv", timeVar="week", depStruct = "ARp", pAR=3, control = lmmControl(parallelnu=FALSE,parallelphi=FALSE,algorithm = "EM", quiet = TRUE,alphas=0.5,nknots=7))
+thetaSSLar3=smsn.lmm(dado, formFixed = score ~ 1, formFixedNL= ~ -1+time, formRandom = ~ 1+time, distr = 'ss', groupVar = "indiv", timeVar="week", depStruct = "ARp", pAR=3, control = lmmControl(parallelnu=FALSE,parallelphi=FALSE,algorithm = "EM", quiet = TRUE,alphas=0.5,nknots=7))
+thetaSCNar3=smsn.lmm(dado, formFixed = score ~ 1, formFixedNL= ~ -1+time, formRandom = ~ 1+time, distr = 'scn', groupVar = "indiv", timeVar="week", depStruct = "ARp", pAR=3, control = lmmControl(parallelnu=FALSE,parallelphi=FALSE,algorithm = "EM", quiet = TRUE,alphas=0.5,nknots=7))
+
+thetaNdec=smn.lmm(dado, formFixed = score ~ 1, formFixedNL= ~ -1+time, formRandom = ~ 1+time, distr = 'norm', groupVar = "indiv", timeVar="week", depStruct = "DEC", control = lmmControl(parallelnu=FALSE,parallelphi=FALSE,algorithm = "EM", quiet = TRUE,alphas=0.5,nknots=7))
+thetaSNdec=smsn.lmm(dado, formFixed = score ~ 1, formFixedNL= ~ -1+time, formRandom = ~ 1+time, distr = 'sn', groupVar = "indiv", timeVar="week", depStruct = "DEC", control = lmmControl(parallelnu=FALSE,parallelphi=FALSE,algorithm = "EM", quiet = TRUE,alphas=0.5,nknots=7))
+thetaSTdec=smsn.lmm(dado, formFixed = score ~ 1, formFixedNL= ~ -1+time, formRandom = ~ 1+time, distr = 'st', groupVar = "indiv", timeVar="week", depStruct = "DEC", control = lmmControl(parallelnu=FALSE,parallelphi=FALSE,algorithm = "EM", quiet = TRUE,alphas=0.5,nknots=7))
+thetaSSLdec=smsn.lmm(dado, formFixed = score ~ 1, formFixedNL= ~ -1+time, formRandom = ~ 1+time, distr = 'ss', groupVar = "indiv", timeVar="week", depStruct = "DEC", control = lmmControl(parallelnu=FALSE,parallelphi=FALSE,algorithm = "EM", quiet = TRUE,alphas=0.5,nknots=7))
+thetaSCNdec=smsn.lmm(dado, formFixed = score ~ 1, formFixedNL= ~ -1+time, formRandom = ~ 1+time, distr = 'scn', groupVar = "indiv", timeVar="week", depStruct = "DEC", control = lmmControl(parallelnu=FALSE,parallelphi=FALSE,algorithm = "EM", quiet = TRUE,alphas=0.5,nknots=7))
+
+thetaNcar1=smn.lmm(dado, formFixed = score ~ 1, formFixedNL= ~ -1+time, formRandom = ~ 1+time, distr = 'norm', groupVar = "indiv", timeVar="week", depStruct = "CAR1", control = lmmControl(parallelnu=FALSE,parallelphi=FALSE,algorithm = "EM", quiet = TRUE,alphas=0.5,nknots=7))
+thetaTcar1=smn.lmm(dado, formFixed = score ~ 1, formFixedNL= ~ -1+time, formRandom = ~ 1+time, distr = 't', groupVar = "indiv", timeVar="week", depStruct = "CAR1", control = lmmControl(parallelnu=FALSE,parallelphi=FALSE,algorithm = "EM", quiet = TRUE,alphas=0.5,nknots=7))
+thetaSNcar1=smsn.lmm(dado, formFixed = score ~ 1, formFixedNL= ~ -1+time, formRandom = ~ 1+time, distr = 'sn', groupVar = "indiv", timeVar="week", depStruct = "CAR1", control = lmmControl(parallelnu=FALSE,parallelphi=FALSE,algorithm = "EM", quiet = TRUE,alphas=0.5,nknots=7))
+thetaSTcar1=smsn.lmm(dado, formFixed = score ~ 1, formFixedNL= ~ -1+time, formRandom = ~ 1+time, distr = 'st', groupVar = "indiv", timeVar="week", depStruct = "CAR1", control = lmmControl(parallelnu=FALSE,parallelphi=FALSE,algorithm = "EM", quiet = TRUE,alphas=0.5,nknots=7))
+thetaSSLcar1=smsn.lmm(dado, formFixed = score ~ 1, formFixedNL= ~ -1+time, formRandom = ~ 1+time, distr = 'ss', groupVar = "indiv", timeVar="week", depStruct = "CAR1", control = lmmControl(parallelnu=FALSE,parallelphi=FALSE,algorithm = "EM", quiet = TRUE,alphas=0.5,nknots=7))
+thetaSCNcar1=smsn.lmm(dado, formFixed = score ~ 1, formFixedNL= ~ -1+time, formRandom = ~ 1+time, distr = 'scn', groupVar = "indiv", timeVar="week", depStruct = "CAR1", control = lmmControl(parallelnu=FALSE,parallelphi=FALSE,algorithm = "EM", quiet = TRUE,alphas=0.5,nknots=7))
+
+
+thetaNcs=smn.lmm(dado, formFixed = score ~ 1, formFixedNL= ~ -1+time, formRandom = ~ 1+time, distr = 'norm', groupVar = "indiv", timeVar="week", depStruct = "CS", control = lmmControl(parallelnu=FALSE,parallelphi=FALSE,algorithm = "EM", quiet = TRUE,alphas=0.5,nknots=7))
+thetaTcs=smn.lmm(dado, formFixed = score ~ 1, formFixedNL= ~ -1+time, formRandom = ~ 1+time, distr = 't', groupVar = "indiv", timeVar="week", depStruct = "CS", control = lmmControl(parallelnu=FALSE,parallelphi=FALSE,algorithm = "EM", quiet = TRUE,alphas=0.5,nknots=7))
+thetaSNcs=smsn.lmm(dado, formFixed = score ~ 1, formFixedNL= ~ -1+time, formRandom = ~ 1+time, distr = 'sn', groupVar = "indiv", timeVar="week", depStruct = "CS", control = lmmControl(parallelnu=FALSE,parallelphi=FALSE,algorithm = "EM", quiet = TRUE,alphas=0.5,nknots=7))
+thetaSTcs=smsn.lmm(dado, formFixed = score ~ 1, formFixedNL= ~ -1+time, formRandom = ~ 1+time, distr = 'st', groupVar = "indiv", timeVar="week", depStruct = "CS", control = lmmControl(parallelnu=FALSE,parallelphi=FALSE,algorithm = "EM", quiet = TRUE,alphas=0.5,nknots=7))
+thetaSSLcs=smsn.lmm(dado, formFixed = score ~ 1, formFixedNL= ~ -1+time, formRandom = ~ 1+time, distr = 'ss', groupVar = "indiv", timeVar="week", depStruct = "CS", control = lmmControl(parallelnu=FALSE,parallelphi=FALSE,algorithm = "EM", quiet = TRUE,alphas=0.5,nknots=7))
+thetaSCNcs=smsn.lmm(dado, formFixed = score ~ 1, formFixedNL= ~ -1+time, formRandom = ~ 1+time, distr = 'scn', groupVar = "indiv", timeVar="week", depStruct = "CS", control = lmmControl(parallelnu=FALSE,parallelphi=FALSE,algorithm = "EM", quiet = TRUE,alphas=0.5,nknots=7))
+
+
+save(thetaNar1,file="thetaNar1.RData")
+save(thetaNar2,file="thetaNar2.RData")
+save(thetaNar3,file="thetaNar3.RData")
+save(thetaNind,file="thetaNind.RData")
+save(thetaTind,file="thetaTind.RData")
+save(thetaSNind,file="thetaSNind.RData")
+save(thetaSTind,file="thetaSTind.RData")
+save(thetaSSLind,file="thetaSSLind.RData")
+save(thetaSCNind,file="thetaSCNind.RData")
+save(thetaSNar1,file="thetaSNar1.RData")
+save(thetaTar1,file="thetaTar1.RData")
+save(thetaSTar1,file="thetaSTar1.RData")
+save(thetaSSLar1,file="thetaSSLar1.RData")
+save(thetaSCNar1,file="thetaSCNar1.RData")
+save(thetaSTar2,file="thetaSTar2.RData")
+save(thetaSNar2,file="thetaSNar2.RData")
+save(thetaTar2,file="thetaTar2.RData")
+save(thetaTar3,file="thetaTar3.RData")
+save(thetaSNar3,file="thetaSNar3.RData")
+save(thetaSTar3,file="thetaSTar3.RData")
+save(thetaSSLar2,file="thetaSSLar2.RData")
+save(thetaSSLar3,file="thetaSSLar3.RData")
+save(thetaSCNar2,file="thetaSCNar2.RData")
+save(thetaSCNar3,file="thetaSCNar3.RData")
+save(thetaNcar1,file="thetaNcar1.RData")
+save(thetaTcar1,file="thetaTcar1.RData")
+save(thetaSNcar1,file="thetaSNcar1.RData")
+save(thetaSTcar1,file="thetaSTcar1.RData")
+save(thetaSSLcar1,file="thetaSSLcar1.RData")
+save(thetaSCNcar1,file="thetaSCNcar1.RData")
+save(thetaNcs,file="thetaNcar1.RData")
+save(thetaSNcs,file="thetaSNcs.RData")
+save(thetaSTcs,file="thetaSTcs.RData")
+save(thetaSSLcs,file="thetaSSLcs.RData")
+save(thetaSCNcs,file="thetaSCNcs.RData")
+
+
+
+
+tabAIC=matrix(0,5,6)
+colnames(tabAIC)=c("UNC","AR(1)","AR(2)","AR(3)","CAR1","CS")
+rownames(tabAIC)=c("N","SN","ST","SSL","SCN")
+a=1
+tabAIC[1,a]=thetaNind$criteria$AIC
+tabAIC[2,a]=thetaSNind$criteria$AIC
+tabAIC[3,a]=thetaSTind$criteria$AIC
+tabAIC[4,a]=thetaSSLind$criteria$AIC
+tabAIC[5,a]=thetaSCNind$criteria$AIC
+a=2
+tabAIC[1,a]=thetaNar1$criteria$AIC
+tabAIC[2,a]=thetaSNar1$criteria$AIC
+tabAIC[3,a]=thetaSTar1$criteria$AIC
+tabAIC[4,a]=thetaSSLar1$criteria$AIC
+tabAIC[5,a]=thetaSCNar1$criteria$AIC
+a=3
+tabAIC[1,a]=thetaNar2$criteria$AIC
+tabAIC[2,a]=thetaSNar2$criteria$AIC
+tabAIC[3,a]=thetaSTar2$criteria$AIC
+tabAIC[4,a]=thetaSSLar2$criteria$AIC
+tabAIC[5,a]=thetaSCNar2$criteria$AIC
+a=4
+tabAIC[1,a]=thetaNar3$criteria$AIC
+tabAIC[2,a]=thetaSNar3$criteria$AIC
+tabAIC[3,a]=thetaSTar3$criteria$AIC
+tabAIC[4,a]=thetaSSLar3$criteria$AIC
+tabAIC[5,a]=thetaSCNar3$criteria$AIC
+a=5
+tabAIC[1,a]=thetaNcar1$criteria$AIC
+tabAIC[2,a]=thetaSNcar1$criteria$AIC
+tabAIC[3,a]=thetaSTcar1$criteria$AIC
+tabAIC[4,a]=thetaSSLcar1$criteria$AIC
+tabAIC[5,a]=thetaSCNcar1$criteria$AIC
+a=6
+tabAIC[1,a]=thetaNcs$criteria$AIC
+tabAIC[2,a]=thetaSNcs$criteria$AIC
+tabAIC[3,a]=thetaSTcs$criteria$AIC
+tabAIC[4,a]=thetaSSLcs$criteria$AIC
+tabAIC[5,a]=thetaSCNcs$criteria$AIC
+
+
+tabBIC=matrix(0,5,6)
+colnames(tabBIC)=c("UNC","AR(1)","AR(2)","AR(3)","CAR1","CS")
+rownames(tabBIC)=c("N","SN","ST","SSL","SCN")
+a=1
+tabBIC[1,a]=thetaNind$criteria$BIC
+tabBIC[2,a]=thetaSNind$criteria$BIC
+tabBIC[3,a]=thetaSTind$criteria$BIC
+tabBIC[4,a]=thetaSSLind$criteria$BIC
+tabBIC[5,a]=thetaSCNind$criteria$BIC
+a=2
+tabBIC[1,a]=thetaNar1$criteria$BIC
+tabBIC[2,a]=thetaSNar1$criteria$BIC
+tabBIC[3,a]=thetaSTar1$criteria$BIC
+tabBIC[4,a]=thetaSSLar1$criteria$BIC
+tabBIC[5,a]=thetaSCNar1$criteria$BIC
+a=3
+tabBIC[1,a]=thetaNar2$criteria$BIC
+tabBIC[2,a]=thetaSNar2$criteria$BIC
+tabBIC[3,a]=thetaSTar2$criteria$BIC
+tabBIC[4,a]=thetaSSLar2$criteria$BIC
+tabBIC[5,a]=thetaSCNar2$criteria$BIC
+a=4
+tabBIC[1,a]=thetaNar3$criteria$BIC
+tabBIC[2,a]=thetaSNar3$criteria$BIC
+tabBIC[3,a]=thetaSTar3$criteria$BIC
+tabBIC[4,a]=thetaSSLar3$criteria$BIC
+tabBIC[5,a]=thetaSCNar3$criteria$BIC
+a=5
+tabBIC[1,a]=thetaNcar1$criteria$BIC
+tabBIC[2,a]=thetaSNcar1$criteria$BIC
+tabBIC[3,a]=thetaSTcar1$criteria$BIC
+tabBIC[4,a]=thetaSSLcar1$criteria$BIC
+tabBIC[5,a]=thetaSCNcar1$criteria$BIC
+a=6
+tabBIC[1,a]=thetaNcs$criteria$BIC
+tabBIC[2,a]=thetaSNcs$criteria$BIC
+tabBIC[3,a]=thetaSTcs$criteria$BIC
+tabBIC[4,a]=thetaSSLcs$criteria$BIC
+tabBIC[5,a]=thetaSCNcs$criteria$BIC
+
+
+
+######################################################################################################
+######################################################################################################
+# For covariance via bootstrap
+
+dado1<-read.table("Schizo.txt",sep=' ',col.names = c("trat","ns","indiv","week","score","cod"))
+dados=dado1[,c(5,3,4)]
+time1=(as.numeric(dados[,3])-3)/10
+time=dados[,3]+1
+dado=cbind(dados,time1,time)
+dado[,1]=dado[,1]/10 
+dado=dado[order(dado[,2]),]
+
+Nline=nrow(dado)
+indline=1:Nline
+ni=as.numeric(table(dado[,2]))
+m=length(ni)
+na1=rep(0,m)
+for (i in 1:m){
+    aux=ni[1:i]
+    na1[i]=sum(aux)
+    }
+na2=c(0,na1)
+for (i in 1:m){
+     aux=(na2[i]+1):(na2[i+1])
+     if (ni[i]<5)   indline[aux]=0
+}
+dado=dado[indline>0,]
+ni=as.numeric(table(dado[,2])) # indiv
+m=length(ni)
+
+thetaSTar1=smsn.lmm(dado, formFixed = score ~ 1, formFixedNL= ~ -1+time1, formRandom = ~ 1+time1, distr = 'st', groupVar = "indiv", timeVar="time", depStruct = "ARp", pAR=1, control = lmmControl(parallelnu=FALSE,parallelphi=FALSE,algorithm = "EM", quiet = TRUE,alphas=0.5,nknots=7))
+source('functions.r')
+thetaSTar1boot=cov.theta(thetaSTar1)
+write.table(thetaSTar1boot,file="thetaSTar1boot.RData")
+
+
+#######################################################################################################33
+######################################################################################################
+# Graphics
+
+
+resind=residuals.SMSN(thetaSTind,level="conditional",type="response")
+par(mfrow=c(2,2))
+hist(resind)
+boxplot(resind)
+acf(resind)
+pacf(resind)
+
+
+par(mfrow = c(2,2))
+plot.ts(resind,ylab='Standardized residual')
+plot(as.numeric(sapply(1:15, Box.test, x=resind, fitdf=0, type="Ljung-Box")[3,]), ylim = 0:1, main="Ljung-Box test", ylab="p-value", xlab="Lag");abline(h=.05,lty=2,col=4)
+acf(resind, lag.max = 15,main='Series standard residuals')
+pacf(resind, lag.max = 15,main='Series standard residuals')
+
+
+### Curves
+thetaSTar1=load("thetaSTar1.RData")
+nknots=7
+ni1=ni
+na1=rep(0,m)
+for (i in 1:m){
+    aux=ni1[1:i]
+    na1[i]=sum(aux)
+    }
+na2=c(0,na1)
+
+aux=1:na2[2]
+t1=seq(1,max(aux),length=100)
+N1=bsplinec(t1,nknots,4)
+gammaest=thetaSTar1$estimates$gammas
+beta0=as.numeric(thetaSTar1$theta[1])
+f1=N1%*%gammaest[[1]]
+
+time=dado[,3]
+score=dado[,1]
+aux=(na2[1]+1):(na2[2])
+plot(1:length(aux),score[aux]-beta0,type='l',col="grey",ylim=c(-3,4),xlab="Week",ylab="Parametric residual") 
+for (i in 2:m){
+     aux=(na2[i]+1):(na2[i+1])
+     lines(1:length(aux),score[aux]-beta0,col="grey")      
+     }
+lines(t1,f1,type='l',col="black",lwd=2)
+
+
+plot(thetaSTar1)
+plot(thetaSTar1, useweight=FALSE)
+library(ggplot2)
+plot(thetaSTar1) + ggtitle("ST-LMM for schizophrenia data")
+
+
+acfCI = acfresid(thetaSTar1, calcCI=TRUE)
+plot(acfCI)
+
+
+
+##################################################################################
+# Envelopes tipo log density
+setwd("D:/Pesquisa/SemiParametricos/MixedAPLM")
+source('residual_quantile.R')
+
+load("thetaNind.RData")
+load("thetaNar1.RData")
+load("thetaSNar1.RData")
+load("thetaSTar1.RData")
+load("thetaTar1.RData")
+load("thetaSCNar1.RData")
+
+plot_log_density(thetaSTar1,replic=100)
+
+
+
