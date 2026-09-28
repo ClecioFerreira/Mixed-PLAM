@@ -1,0 +1,94 @@
+
+## storing the "task id"
+k <- commandArgs(trailingOnly = TRUE)[1]
+
+# True values
+betas=c(1,2)
+Beta = matrix(c(1,2),ncol=1)
+phi1=0.6
+phi2=-0.2
+phiAR=c(phi1,phi2) 
+D1=2
+lambda=3
+sigma2e=0.25
+nuT=5
+alphas=1
+nknots=12
+p_ast=length(Beta)+3+length(phiAR)+length(nuT)
+thetav=c(as.vector(Beta),sigma2e,phiAR,sqrt(D1),lambda,nuT)
+################################################################################
+
+## setting seed for reproducibility
+#set.seed(1234)
+
+n=500
+nin=50*rep(1,n)
+ind=1:(n*50)
+X=c()
+t1=c()
+Subject=c()
+timet=c()
+for (i in 1:n){
+     ni=nin[i]
+     t1i=matrix(runif(ni,0.6,1.6),ni,1)
+     Xi = cbind(runif(ni,0,10),runif(ni,0,2))
+     X=rbind(X,Xi)
+     t1=rbind(t1,matrix(t1i))
+     Subject=rbind(Subject,matrix(rep(i,ni)))
+     timet=rbind(timet,matrix(1:ni))
+     }
+
+
+## setting seed for reproducibility
+#set.seed(as.integer(k))
+source('functions.R')
+#     aux=0
+#    while (aux==0){
+Y=c()  
+for (i in 1:n){
+    ni=nin[i]
+    Xi = X[ind[(ni*(i-1)+1):(ni*i)],]
+    Zi = matrix(1,nrow=ni)
+    t1i=t1[ind[(ni*(i-1)+1):(ni*i)]]
+    ft1i=cos(4*pi*t1i)*exp(-t1i^2/2)             
+    mui=Xi%*%Beta+ft1i  
+    auxi=rsmsn.lmm(1:ni,mui,Zi,sigma2e,D1,betas,lambda,depStruct="ARp",phi=phiAR,distr="st",nu=nuT)
+    Y=rbind(Y,matrix(auxi$y))    
+}
+dat1=data.frame(y=Y,x=X,t1=t1,Subject=Subject,time=timet)
+# Normal
+theta0=smn.lmm(dat1, formFixed = y ~ -1 + x.1 + x.2, formFixedNL= ~ -1+ t1, formRandom = ~ 1, distr = 'norm', groupVar = "Subject", timeVar="time", depStruct = "ARp", pAR=length(phiAR), control = lmmControl(algorithm = "EM", quiet = TRUE,alphas=alphas,nknots=nknots,parallelphi=FALSE,parallelnu=FALSE))
+theta=as.vector(theta0$theta)  # beta,sigma2e,phi,Dmeio,
+gama=thetaj$estimates$gammas[[1]]
+thetan=c(theta,theta0$loglik,as.vector(gama))
+
+# SN
+theta0=smsn.lmm(dat1, formFixed = y ~ -1 + x.1 + x.2, formFixedNL= ~ -1+ t1, formRandom = ~ 1, distr = 'sn', groupVar = "Subject", timeVar="time", depStruct = "ARp", pAR=length(phiAR), control = lmmControl(algorithm = "EM", quiet = TRUE,alphas=alphas,nknots=nknots,parallelphi=FALSE,parallelnu=FALSE))
+theta=as.vector(theta0$theta)  # beta,sigma2e,phi,Dmeio,lambda
+gama=thetaj$estimates$gammas[[1]]
+thetasn=c(theta,theta0$loglik,as.vector(gama))
+
+# ST
+theta0=smsn.lmm(dat1, formFixed = y ~ -1 + x.1 + x.2, formFixedNL= ~ -1+ t1, formRandom = ~ 1, distr = 'st', groupVar = "Subject", timeVar="time", depStruct = "ARp", pAR=length(phiAR), control = lmmControl(algorithm = "EM", quiet = TRUE,alphas=alphas,nknots=nknots,parallelphi=FALSE,parallelnu=FALSE))
+theta=as.vector(theta0$theta)  # beta,sigma2e,phi,Dmeio,lambda,nu
+gama=thetaj$estimates$gammas[[1]]
+thetast=c(theta,theta0$loglik,as.vector(gama))
+
+# Skew-Slash
+theta0=smsn.lmm(dat1, formFixed = y ~ -1 + x.1 + x.2, formFixedNL= ~ -1+ t1, formRandom = ~ 1, distr = 'ssl', groupVar = "Subject", timeVar="time", depStruct = "ARp", pAR=length(phiAR), control = lmmControl(algorithm = "EM", quiet = TRUE,alphas=alphas,nknots=nknots,parallelphi=FALSE,parallelnu=FALSE))
+theta=as.vector(theta0$theta)  # beta,sigma2e,phi,Dmeio,lambda,nu
+thetassl=c(theta,theta0$loglik,as.vector(gama))
+
+# SCN        
+theta0=smsn.lmm(dat1, formFixed = y ~ -1 + x.1 + x.2, formFixedNL= ~ -1+ t1, formRandom = ~ 1, distr = 'scn', groupVar = "Subject", timeVar="time", depStruct = "ARp", pAR=length(phiAR), control = lmmControl(algorithm = "EM", quiet = TRUE,alphas=alphas,nknots=nknots,parallelphi=FALSE,parallelnu=FALSE))
+theta=as.vector(theta0$theta)  # beta,sigma2e,phi,Dmeio,lambda,nu,gama
+gama=thetaj$estimates$gammas[[1]]
+thetascn=c(theta,theta0$loglik,as.vector(gama))
+
+thetam=c(thetan,thetasn,thetast,thetassl,thetascn)
+
+## saving results
+filename <-
+  sprintf("ST2/stn%s.rds", k)
+saveRDS(thetam, file = filename)
+
