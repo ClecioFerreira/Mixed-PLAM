@@ -2,7 +2,7 @@
 ## storing the "task id"
 k <- commandArgs(trailingOnly = TRUE)[1]
 
-# True values
+## True values
 betas=c(1,2)
 Beta = matrix(c(1,2),ncol=1)
 phi1=0.6
