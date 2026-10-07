@@ -309,6 +309,27 @@ lmmControl <- function(tol=1e-6,max.iter=300,calc.se=FALSE,
 ###########################################################################################################################
 ############# SMSN models
 
+BICtau <- function(tau0,method="Brent",data, formFixed, formFixedNL, groupVar, formRandom = ~1, depStruct = "UNC", timeVar = NULL, distr = "sn", covRandom = "pdSymm", skewind, pAR = 1, control = lmmControl()) 
+{
+control1=control
+control1$alphas=tau0
+if (nrow(tau0)>1){
+  tau.est <- optim(tau0,BICSMSN,gr=NULL,method,data, formFixed, formFixedNL, groupVar, formRandom, depStruct, timeVar, distr, covRandom, skewind, pAR, control1)  
+}
+if (nrow(tau0)==1){
+  tau.est <- optimize(BICSMSN,interval=as.numeric(tau0),data, formFixed, formFixedNL, groupVar, formRandom, depStruct, timeVar, distr, covRandom, skewind, pAR, control1)  
+}
+  return(tau.est)  
+}
+
+BICSMSN <- function(tau,data, formFixed, formFixedNL, groupVar, formRandom, depStruct, timeVar, distr, covRandom, skewind, pAR, control) 
+{print(tau)
+theta=smsn.lmm(data, formFixed, formFixedNL, groupVar, formRandom, depStruct, timeVar, distr, covRandom, skewind, pAR, control) 
+  BIC=theta$criteria$BIC
+  return(BIC)  
+}
+
+
 smsn.lmm  <- function(data, formFixed, formFixedNL, groupVar, formRandom = ~1, depStruct = "UNC", timeVar = NULL, distr = "sn", covRandom = "pdSymm", skewind, pAR = 1, control = lmmControl())    # data tem de ser formato dataframe
 {
     if (!is(formFixed, "formula")) 
@@ -1702,6 +1723,25 @@ for (j in 1:qnl){
 #######################################################################################################################
 ###################SMN
 
+BICstau <- function(tau0,method="Brent",data, formFixed, formFixedNL, groupVar, formRandom = ~1, depStruct = "UNC", timeVar = NULL, distr = "sn", covRandom = "pdSymm", skewind, pAR = 1, control = lmmControl()) 
+{
+control1=control
+control1$alphas=tau0
+if (nrow(tau0)>1){
+  tau.est <- optim(tau0,BICSMN,gr=NULL,method,data, formFixed, formFixedNL, groupVar, formRandom, depStruct, timeVar, distr, covRandom, pAR, control1)  
+}
+if (nrow(tau0)==1){
+  tau.est <- optimize(BICSMN,interval=as.numeric(tau0),data, formFixed, formFixedNL, groupVar, formRandom, depStruct, timeVar, distr, covRandom, pAR, control1)  
+}
+  return(tau.est)  
+}
+
+BICSMN <- function(tau,data, formFixed, formFixedNL, groupVar, formRandom, depStruct, timeVar, distr, covRandom, pAR, control) 
+{print(tau)
+theta=smn.lmm(data, formFixed, formFixedNL, groupVar, formRandom, depStruct, timeVar, distr, covRandom, pAR, control) 
+  BIC=theta$criteria$BIC
+  return(BIC)  
+}
 
 
 smn.lmm  <- function(data, formFixed, formFixedNL, groupVar, formRandom = ~1, depStruct = "UNC", 
