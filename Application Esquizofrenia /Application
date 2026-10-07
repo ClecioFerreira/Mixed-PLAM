@@ -296,6 +296,10 @@ source('functions.r')
 thetaSTar1boot=cov.theta(thetaSTar1)
 write.table(thetaSTar1boot,file="thetaSTar1boot.RData")
 
+# For selecting the smoothing parameter via BIC
+thau.est=BICtau(matrix(c(0.5,1),ncol=2),dado, formFixed = score ~ 1, formFixedNL= ~ -1+time1, formRandom = ~ 1+time1, distr = 'st', groupVar = "indiv", timeVar="time", depStruct = "ARp", pAR=1, control = lmmControl(parallelnu=FALSE,parallelphi=FALSE,algorithm = "EM", quiet = TRUE,nknots=7))
+
+
 
 #######################################################################################################33
 ######################################################################################################
